@@ -167,10 +167,6 @@ def _impl(array, axis, highlevel, behavior):
 
     if axis is None:
         out = ak._do.remove_structure(layout, function_name="ak.flatten")
-        assert isinstance(out, tuple) and all(
-            isinstance(x, ak.contents.NumpyArray) for x in out
-        )
-
         result = ak._do.mergemany(out)
 
         return ak._util.wrap(result, behavior, highlevel)
@@ -181,7 +177,7 @@ def _impl(array, axis, highlevel, behavior):
             backend = layout.backend
 
             if layout.is_unknown:
-                return apply(ak.contents.NumpyArray(backend.nplike.asarray([])))
+                return apply(layout.to_NumpyArray(np.float64))
 
             elif layout.is_indexed:
                 return apply(layout.project())
