@@ -47,6 +47,14 @@ def ensure_known_scalar(value: T, default: S) -> T | S:
     return default if is_unknown_scalar(value) else value
 
 
+K = TypeVar("K")
+
+
+def cast_known_scalar(value: T, cls: type[K], *, default: S) -> K | S:
+    assert not is_unknown_scalar(default)
+    return default if is_unknown_scalar(value) else cls(value)
+
+
 def _emptyarray(x):
     if is_unknown_scalar(x):
         return numpy.empty(0, x._dtype)
@@ -811,15 +819,15 @@ class TypeTracer(NumpyLike):
         else:
             raise wrap_error(TypeError(f"expected scalar type, received {obj}"))
 
-    def shape_item_as_scalar(self, x1: ShapeItem) -> TypeTracerArray:
+    def shape_item_as_scalar(self, x1: ShapeItem) -> SupportsInt:
         if x1 is None:
             return TypeTracerArray._new(np.int64, shape=())
         elif isinstance(x1, int):
-            return TypeTracerArray._new(np.int64, shape=())
+            return x1
         else:
             raise wrap_error(TypeError(f"expected None or int type, received {x1}"))
 
-    def scalar_as_shape_item(self, x1) -> ShapeItem:
+    def scalar_as_shape_item(self, x1: SupportsInt) -> ShapeItem:
         if x1 is None:
             return None
         elif is_unknown_scalar(x1) and np.issubdtype(x1.dtype, np.integer):
@@ -985,9 +993,17 @@ class TypeTracer(NumpyLike):
         try_touch_data(x)
         return (TypeTracerArray._new(np.int64, (None,)),) * len(x.shape)
 
+    def where(self, where: ArrayLike, x1: ArrayLike, x2: ArrayLike) -> TypeTracerArray:
+        try_touch_data(where)
+        try_touch_data(x1)
+        try_touch_data(x2)
+        where, x1, x2 = self.broadcast_arrays(where, x1, x2)
+        result_type = numpy.result_type(x1.dtype, x2.dtype)
+        return TypeTracerArray._new(result_type, shape=where.shape)
+
     def unique_values(self, x: ArrayLike) -> TypeTracerArray:
         try_touch_data(x)
-        return TypeTracerArray._new(x.dtype)
+        return TypeTracerArray._new(x.dtype, shape=(None,))
 
     def concat(self, arrays, *, axis: int | None = 0) -> TypeTracerArray:
         if axis is None:

@@ -12,6 +12,7 @@ from awkward._nplikes import to_nplike
 from awkward._nplikes.numpy import Numpy
 from awkward._nplikes.numpylike import NumpyLike, NumpyMetadata, ShapeItem
 from awkward._nplikes.typetracer import TypeTracer
+from awkward._slicing import regularise_slice
 from awkward._util import unset
 from awkward.forms.form import Form, JSONMapping, _type_parameters_equal
 from awkward.index import Index, Index64
@@ -535,7 +536,9 @@ class Content:
             return self._getitem_at(where)
 
         elif isinstance(where, slice) and where.step is None:
-            return self._getitem_range(where)
+            # Ensure that start, stop are non-negative!
+            start, stop, _ = regularise_slice(where, self.length, backend=self._backend)
+            return self._getitem_range(start, stop)
 
         elif isinstance(where, slice):
             return self._getitem((where,))
@@ -702,7 +705,7 @@ class Content:
     def _getitem_at(self, where: SupportsIndex):
         raise ak._errors.wrap_error(NotImplementedError)
 
-    def _getitem_range(self, where: slice) -> Content:
+    def _getitem_range(self, start: SupportsIndex, stop: SupportsIndex) -> Content:
         raise ak._errors.wrap_error(NotImplementedError)
 
     def _getitem_field(

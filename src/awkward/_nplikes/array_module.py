@@ -130,23 +130,20 @@ class ArrayModuleNumpyLike(NumpyLike):
         else:
             return result
 
-    def shape_item_as_scalar(self, x1: ShapeItem):
+    def shape_item_as_scalar(self, x1: ShapeItem) -> SupportsInt:
         if x1 is None:
             raise ak._errors.wrap_error(
                 TypeError("array module nplikes do not support unknown lengths")
             )
         elif isinstance(x1, int):
-            return self._module.asarray(x1, dtype=np.int64)
+            return x1
         else:
             raise ak._errors.wrap_error(
                 TypeError(f"expected None or int type, received {x1}")
             )
 
-    def scalar_as_shape_item(self, x1) -> ShapeItem:
-        if x1 is None:
-            return None
-        else:
-            return int(x1)
+    def scalar_as_shape_item(self, x1: SupportsInt) -> ShapeItem:
+        return int(x1)
 
     def add_shape_item(self, x1: ShapeItem, x2: ShapeItem) -> ShapeItem:
         assert x1 >= 0
@@ -174,6 +171,9 @@ class ArrayModuleNumpyLike(NumpyLike):
 
     def nonzero(self, x: ArrayLike) -> tuple[ArrayLike, ...]:
         return self._module.nonzero(x)
+
+    def where(self, where: ArrayLike, x1: ArrayLike, x2: ArrayLike) -> ArrayLike:
+        return self._module.where(where, x1, x2)
 
     def unique_values(self, x: ArrayLike) -> ArrayLike:
         return self._module.unique(

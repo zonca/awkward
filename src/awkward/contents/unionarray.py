@@ -456,7 +456,7 @@ class UnionArray(Content):
         return "".join(out)
 
     def _getitem_nothing(self):
-        return self._getitem_range(slice(0, 0))
+        return self._getitem_range(0, 0)
 
     def _getitem_at(self, where: SupportsIndex):
         if not self._backend.nplike.known_data:
@@ -470,13 +470,11 @@ class UnionArray(Content):
         tag, index = self._tags[where], self._index[where]
         return self._contents[tag]._getitem_at(index)
 
-    def _getitem_range(self, where):
+    def _getitem_range(self, start: SupportsIndex, stop: SupportsIndex) -> Content:
         if not self._backend.nplike.known_shape:
             self._touch_shape(recursive=False)
             return self
 
-        start, stop, step = where.indices(self.length)
-        assert step == 1
         return UnionArray(
             self._tags[start:stop],
             self._index[start:stop],

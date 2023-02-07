@@ -302,11 +302,11 @@ class NumpyLike(Singleton, Protocol):
         ...
 
     @abstractmethod
-    def shape_item_as_scalar(self, x1: ShapeItem):
+    def shape_item_as_scalar(self, x1: ShapeItem) -> SupportsInt:
         ...
 
     @abstractmethod
-    def scalar_as_shape_item(self, x1) -> ShapeItem:
+    def scalar_as_shape_item(self, x1: SupportsInt) -> ShapeItem:
         ...
 
     @abstractmethod
@@ -333,6 +333,10 @@ class NumpyLike(Singleton, Protocol):
 
     @abstractmethod
     def nonzero(self, x: ArrayLike) -> tuple[ArrayLike, ...]:
+        ...
+
+    @abstractmethod
+    def where(self, where: ArrayLike, x1: ArrayLike, x2: ArrayLike) -> ArrayLike:
         ...
 
     @abstractmethod

@@ -40,6 +40,8 @@ class RecordArray(Content):
         parameters=None,
         backend=None,
     ):
+        if not (length is None or length is unset):
+            length = int(length)  # TODO: this should not happen!
         if not isinstance(contents, Iterable):
             raise ak._errors.wrap_error(
                 TypeError(
@@ -325,7 +327,7 @@ class RecordArray(Content):
             return out[: self._length]
 
     def _getitem_nothing(self) -> Content:
-        return self._getitem_range(slice(0, 0))
+        return self._getitem_range(0, 0)
 
     def _getitem_at(self, where: SupportsIndex):
         if self._backend.nplike.known_shape and where < 0:
@@ -335,15 +337,15 @@ class RecordArray(Content):
             raise ak._errors.index_error(self, where)
         return Record(self, where)
 
-    def _getitem_range(self, where):
+    def _getitem_range(self, start: SupportsIndex, stop: SupportsIndex) -> Content:
         if not self._backend.nplike.known_shape:
             self._touch_shape(recursive=False)
             return self
 
         if self._length is None:
             return self
-        start, stop, step = where.indices(self.length)
-        assert step == 1
+        from awkward._nplikes.typetracer import cast_known_scalar
+
         if len(self._contents) == 0:
             start = min(max(start, 0), self._length)
             stop = min(max(stop, 0), self._length)
@@ -352,16 +354,15 @@ class RecordArray(Content):
             return RecordArray(
                 [],
                 self._fields,
-                stop - start,
+                cast_known_scalar(stop - start, int, default=None),
                 parameters=self._parameters,
                 backend=self._backend,
             )
         else:
-            nextslice = slice(start, stop)
             return RecordArray(
-                [x._getitem_range(nextslice) for x in self._contents],
+                [x._getitem_range(start, stop) for x in self._contents],
                 self._fields,
-                stop - start,
+                cast_known_scalar(stop - start, int, default=None),
                 parameters=self._parameters,
                 backend=self._backend,
             )
@@ -519,7 +520,7 @@ class RecordArray(Content):
         else:
             contents = []
             for content in self._contents:
-                trimmed = content._getitem_range(slice(0, self.length))
+                trimmed = content._getitem_range(0, self.length)
                 offsets, flattened = trimmed._offsets_and_flattened(axis, depth)
                 if self._backend.nplike.known_shape and offsets.length != 0:
                     raise ak._errors.wrap_error(
