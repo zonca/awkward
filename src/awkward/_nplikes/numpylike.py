@@ -16,7 +16,7 @@ from awkward.typing import (
     overload,
 )
 
-ShapeItem: TypeAlias = "SupportsInt | None"
+ShapeItem: TypeAlias = "int | None"
 
 
 class ArrayLike(Protocol):
