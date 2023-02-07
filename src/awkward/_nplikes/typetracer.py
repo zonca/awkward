@@ -385,7 +385,7 @@ class TypeTracerArray(NDArrayOperatorsMixin, ArrayLike):
             )
         )
 
-    def _resolve_slice_length(self, length, slice_):
+    def _resolve_slice_length(self, length: ShapeItem, slice_) -> ShapeItem:
         if length is None:
             return None
         elif any(
