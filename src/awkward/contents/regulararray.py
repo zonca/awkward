@@ -219,12 +219,9 @@ class RegularArray(Content):
         return self._content._getitem_range(0, 0)
 
     def _getitem_at(self, where: SupportsIndex):
-        if self._backend.nplike.known_shape and where < 0:
-            where += self._length
-
-        if not (self._length is None or 0 <= where < self._length):
-            raise ak._errors.index_error(self, where)
-        start, stop = (where) * self._size, (where + 1) * self._size
+        where = ak._slicing.regularize_index(where, self._length, backend=self._backend)
+        size_scalar = self._backend.index_nplike.shape_item_as_scalar(self._size)
+        start, stop = (where) * size_scalar, (where + 1) * size_scalar
         return self._content._getitem_range(start, stop)
 
     def _getitem_range(self, start: SupportsIndex, stop: SupportsIndex) -> Content:
@@ -418,19 +415,25 @@ class RegularArray(Content):
 
         elif isinstance(head, slice):
             nexthead, nexttail = ak._slicing.headtail(tail)
-            start, stop, step = head.indices(self._size)
+            # Handle unknown sizes
+            if self._size is None:
+                nextsize = None
+                start = 0
+                step = 1 if head.step is None else head.step
+            else:
+                start, stop, step = head.indices(self._size)
 
-            nextsize = 0
-            if step > 0 and stop - start > 0:
-                diff = stop - start
-                nextsize = diff // step
-                if diff % step != 0:
-                    nextsize += 1
-            elif step < 0 and stop - start < 0:
-                diff = start - stop
-                nextsize = diff // (step * -1)
-                if diff % step != 0:
-                    nextsize += 1
+                nextsize = 0
+                if step > 0 and stop - start > 0:
+                    diff = stop - start
+                    nextsize = diff // step
+                    if diff % step != 0:
+                        nextsize += 1
+                elif step < 0 and stop - start < 0:
+                    diff = start - stop
+                    nextsize = diff // (step * -1)
+                    if diff % step != 0:
+                        nextsize += 1
 
             nextcarry = ak.index.Index64.empty(
                 index_nplike.mul_shape_item(self._length, nextsize), index_nplike
