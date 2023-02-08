@@ -301,8 +301,16 @@ class NumpyLike(Singleton, Protocol):
     def broadcast_to(self, x: ArrayLike, shape: tuple[ShapeItem, ...]) -> ArrayLike:
         ...
 
+    @overload
+    def shape_item_as_scalar(self, x1: int) -> int:
+        ...
+
+    @overload
+    def shape_item_as_scalar(self, x1: None) -> ArrayLike:
+        ...
+
     @abstractmethod
-    def shape_item_as_scalar(self, x1: ShapeItem) -> int | ArrayLike:
+    def shape_item_as_scalar(self, x1):
         ...
 
     @abstractmethod
