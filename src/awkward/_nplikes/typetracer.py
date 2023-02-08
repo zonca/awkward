@@ -980,14 +980,6 @@ class TypeTracer(NumpyLike):
         try_touch_data(x)
         return (TypeTracerArray._new(np.int64, (None,)),) * len(x.shape)
 
-    def where(self, where: ArrayLike, x1: ArrayLike, x2: ArrayLike) -> TypeTracerArray:
-        try_touch_data(where)
-        try_touch_data(x1)
-        try_touch_data(x2)
-        where, x1, x2 = self.broadcast_arrays(where, x1, x2)
-        result_type = numpy.result_type(x1.dtype, x2.dtype)
-        return TypeTracerArray._new(result_type, shape=where.shape)
-
     def unique_values(self, x: ArrayLike) -> TypeTracerArray:
         try_touch_data(x)
         return TypeTracerArray._new(x.dtype, shape=(None,))
