@@ -220,7 +220,7 @@ class RegularArray(Content):
 
     def _getitem_at(self, where: SupportsIndex):
         where = ak._slicing.regularize_index(where, self._length, backend=self._backend)
-        size_scalar = self._backend.index_nplike.shape_item_as_scalar(self._size)
+        size_scalar = self._backend.index_nplike.shape_item_as_index(self._size)
         start, stop = (where) * size_scalar, (where + 1) * size_scalar
         return self._content._getitem_range(start, stop)
 

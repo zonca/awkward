@@ -37,7 +37,7 @@ def regularize_index(
         return index
 
     # Without a known length the result must be unknown, as we cannot regularize the index
-    length_scalar = backend.index_nplike.shape_item_as_scalar(length)
+    length_scalar = backend.index_nplike.shape_item_as_index(length)
     if length is None:
         return length_scalar
 
