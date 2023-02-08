@@ -320,7 +320,7 @@ class RecordArray(Content):
 
     def content(self, index_or_field: str | SupportsIndex) -> Content:
         out = self.form_cls.content(self, index_or_field)
-        if out.length == self._length:
+        if out.length == self._length or self._length is None:
             return out
         else:
             assert self._length is not None, "TODO: need to handle this"
