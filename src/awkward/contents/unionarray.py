@@ -653,7 +653,7 @@ class UnionArray(Content):
                 lentags,
             )
         )
-        size = backend.index_nplike.scalar_as_shape_item(_size[0])
+        size = backend.index_nplike.index_as_shape_item(_size[0])
         current = index_cls.empty(size, nplike=backend.index_nplike)
         outindex = index_cls.empty(lentags, nplike=backend.index_nplike)
         assert (

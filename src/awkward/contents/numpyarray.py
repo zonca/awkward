@@ -858,7 +858,7 @@ class NumpyArray(Content):
                     parents_length,
                 )
             )
-            offsets_length = self._backend.index_nplike.scalar_as_shape_item(
+            offsets_length = self._backend.index_nplike.index_as_shape_item(
                 _offsets_length[0]
             )
 
@@ -970,7 +970,7 @@ class NumpyArray(Content):
                     parents_length,
                 )
             )
-            offsets_length = self._backend.index_nplike.scalar_as_shape_item(
+            offsets_length = self._backend.index_nplike.index_as_shape_item(
                 _offsets_length[0]
             )
 

@@ -17,6 +17,7 @@ from awkward.typing import (
 )
 
 ShapeItem: TypeAlias = "int | None"
+IndexType: TypeAlias = "int | ArrayLike"
 
 
 class ArrayLike(Protocol):
@@ -302,19 +303,19 @@ class NumpyLike(Singleton, Protocol):
         ...
 
     @overload
-    def shape_item_as_scalar(self, x1: int) -> int:
+    def shape_item_as_index(self, x1: int) -> int:
         ...
 
     @overload
-    def shape_item_as_scalar(self, x1: None) -> ArrayLike:
+    def shape_item_as_index(self, x1: None) -> ArrayLike:
         ...
 
     @abstractmethod
-    def shape_item_as_scalar(self, x1):
+    def shape_item_as_index(self, x1):
         ...
 
     @abstractmethod
-    def scalar_as_shape_item(self, x1: int | ArrayLike) -> ShapeItem:
+    def index_as_shape_item(self, x1: IndexType) -> ShapeItem:
         ...
 
     @abstractmethod

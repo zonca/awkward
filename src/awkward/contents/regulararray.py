@@ -346,7 +346,7 @@ class RegularArray(Content):
             )
 
         if self._size == 1:
-            carrylen = self._backend.index_nplike.scalar_as_shape_item(offsets[-1])
+            carrylen = self._backend.index_nplike.index_as_shape_item(offsets[-1])
             nextcarry = ak.index.Index64.empty(carrylen, self._backend.index_nplike)
             assert (
                 nextcarry.nplike is self._backend.index_nplike
@@ -923,7 +923,7 @@ class RegularArray(Content):
         else:
             length = index_nplike.mul_shape_item(self._length, self._size)
             next = self._content._getitem_range(
-                0, index_nplike.shape_item_as_scalar(length)
+                0, index_nplike.shape_item_as_index(length)
             )._combinations(n, replacement, recordlookup, parameters, axis, depth + 1)
             return ak.contents.RegularArray(
                 next, self._size, self._length, parameters=self._parameters
@@ -1184,7 +1184,7 @@ class RegularArray(Content):
         )
         length = self._backend.index_nplike.mul_shape_item(self._length, self._size)
         return self._backend.nplike.reshape(
-            out[: self._backend.nplike.shape_item_as_scalar(length)], shape
+            out[: self._backend.nplike.shape_item_as_index(length)], shape
         )
 
     def _to_arrow(self, pyarrow, mask_node, validbytes, length, options):
@@ -1253,7 +1253,7 @@ class RegularArray(Content):
         else:
             index_nplike = self._backend.index_nplike
             length = index_nplike.mul_shape_item(self._length, self._size)
-            content = self._content[: index_nplike.shape_item_as_scalar(length)]
+            content = self._content[: index_nplike.shape_item_as_index(length)]
             contents = content._remove_structure(backend, options)
             if options["keepdims"]:
                 return [
@@ -1334,7 +1334,7 @@ class RegularArray(Content):
             content = self._content.to_packed()
         else:
             content = self._content[
-                : index_nplike.shape_item_as_scalar(length)
+                : index_nplike.shape_item_as_index(length)
             ].to_packed()
 
         return RegularArray(

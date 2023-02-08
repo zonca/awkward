@@ -380,7 +380,7 @@ class ByteMaskedArray(Content):
                 self._valid_when,
             )
         )
-        numnull = self._backend.index_nplike.scalar_as_shape_item(_numnull[0])
+        numnull = self._backend.index_nplike.index_as_shape_item(_numnull[0])
         nextcarry = ak.index.Index64.empty(
             self._backend.index_nplike.sub_shape_item(self.length, numnull),
             nplike=self._backend.index_nplike,
@@ -665,16 +665,14 @@ class ByteMaskedArray(Content):
             for x in others
         ):
             parameters = self._parameters
-            self_length_scalar = self._backend.index_nplike.shape_item_as_scalar(
+            self_length_scalar = self._backend.index_nplike.shape_item_as_index(
                 self.length
             )
             masks = [self._mask.data[:self_length_scalar]]
             tail_contents = []
             length = 0
             for x in others:
-                length_scalar = self._backend.index_nplike.shape_item_as_scalar(
-                    x.length
-                )
+                length_scalar = self._backend.index_nplike.shape_item_as_index(x.length)
                 parameters = ak.forms.form._parameters_intersect(
                     parameters, x._parameters
                 )
@@ -792,7 +790,7 @@ class ByteMaskedArray(Content):
                 self._valid_when,
             )
         )
-        numnull = self._backend.index_nplike.scalar_as_shape_item(_numnull[0])
+        numnull = self._backend.index_nplike.index_as_shape_item(_numnull[0])
 
         next_length = self._backend.index_nplike.sub_shape_item(mask_length, numnull)
         nextcarry = ak.index.Index64.empty(

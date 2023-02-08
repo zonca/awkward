@@ -303,7 +303,7 @@ class IndexedOptionArray(Content):
                 self._index.length,
             )
         )
-        numnull = index_nplike.scalar_as_shape_item(_numnull[0])
+        numnull = index_nplike.index_as_shape_item(_numnull[0])
         nextcarry = ak.index.Index64.empty(
             index_nplike.sub_shape_item(self._index.length, numnull),
             index_nplike,
@@ -490,7 +490,7 @@ class IndexedOptionArray(Content):
                     self._index.length,
                 )
             )
-            numnull = self._backend.index_nplike.scalar_as_shape_item(_numnull[0])
+            numnull = self._backend.index_nplike.index_as_shape_item(_numnull[0])
             nextcarry = ak.index.Index64.empty(
                 self._backend.index_nplike.sub_shape_item(self.length, numnull),
                 self._backend.index_nplike,
@@ -960,13 +960,13 @@ class IndexedOptionArray(Content):
                     index_length,
                 )
             )
-            len_newnulls = self._backend.index_nplike.scalar_as_shape_item(
+            len_newnulls = self._backend.index_nplike.index_as_shape_item(
                 _len_newnulls[0]
             )
 
             newindex = ak.index.Index64.empty(
                 self._backend.index_nplike.add_shape_item(
-                    self._backend.index_nplike.scalar_as_shape_item(out._offsets[-1]),
+                    self._backend.index_nplike.index_as_shape_item(out._offsets[-1]),
                     len_newnulls,
                 ),
                 self._backend.index_nplike,
@@ -1097,7 +1097,7 @@ class IndexedOptionArray(Content):
                 index_length,
             )
         )
-        numnull = self._backend.index_nplike.scalar_as_shape_item(_numnull[0])
+        numnull = self._backend.index_nplike.index_as_shape_item(_numnull[0])
 
         next_length = self._backend.index_nplike.sub_shape_item(index_length, numnull)
         nextparents = ak.index.Index64.empty(next_length, self._backend.index_nplike)

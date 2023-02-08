@@ -402,7 +402,7 @@ class ListArray(Content):
                 ),
                 slicer=ak.contents.ListArray(slicestarts, slicestops, slicecontent),
             )
-            carrylen = self._backend.index_nplike.scalar_as_shape_item(_carrylen[0])
+            carrylen = self._backend.index_nplike.index_as_shape_item(_carrylen[0])
 
             sliceindex = ak.index.Index64(slicecontent._data)
             outoffsets = ak.index.Index64.empty(
@@ -488,7 +488,7 @@ class ListArray(Content):
                 ),
                 slicer=ak.contents.ListArray(slicestarts, slicestops, slicecontent),
             )
-            numvalid = self._backend.index_nplike.scalar_as_shape_item(_numvalid[0])
+            numvalid = self._backend.index_nplike.index_as_shape_item(_numvalid[0])
 
             nextcarry = ak.index.Index64.empty(numvalid, self._backend.index_nplike)
 
@@ -1138,7 +1138,7 @@ class ListArray(Content):
             return self._local_index_axis0()
         elif posaxis is not None and posaxis + 1 == depth + 1:
             offsets = self._compact_offsets64(True)
-            innerlength = self._backend.index_nplike.scalar_as_shape_item(
+            innerlength = self._backend.index_nplike.index_as_shape_item(
                 offsets[-1]
             )  # todo: removed touch_data?
             localindex = ak.index.Index64.empty(innerlength, self._backend.index_nplike)
@@ -1295,7 +1295,7 @@ class ListArray(Content):
                         self._starts.length,
                     )
                 )
-                min_ = self._backend.index_nplike.scalar_as_shape_item(_min[0])
+                min_ = self._backend.index_nplike.index_as_shape_item(_min[0])
                 # TODO: Replace the kernel call with below code once typtracer supports '-'
                 # min_ = self._backend.nplike.min(self._stops.data - self._starts.data)
                 if min_ is not None and target < min_:
@@ -1321,7 +1321,7 @@ class ListArray(Content):
                             self._starts.length,
                         )
                     )
-                    tolength = self._backend.index_nplike.scalar_as_shape_item(
+                    tolength = self._backend.index_nplike.index_as_shape_item(
                         _tolength[0]
                     )
 
