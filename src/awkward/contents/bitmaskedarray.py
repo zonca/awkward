@@ -374,13 +374,9 @@ class BitMaskedArray(Content):
         )
 
     def to_ByteMaskedArray(self):
-        bytemask = ak.index.Index8.empty(
-            self._mask.length * 8, self._backend.index_nplike
-        )
-        assert (
-            bytemask.nplike is self._backend.nplike
-            and self._mask.nplike is self._backend.nplike
-        )
+        index_nplike = self._backend.index_nplike
+        bytemask = ak.index.Index8.empty(self._mask.length * 8, index_nplike)
+        assert bytemask.nplike is index_nplike and self._mask.nplike is index_nplike
         self._backend.maybe_kernel_error(
             self._backend[
                 "awkward_BitMaskedArray_to_ByteMaskedArray",
@@ -395,7 +391,7 @@ class BitMaskedArray(Content):
             )
         )
         return ByteMaskedArray(
-            bytemask[: self._length],
+            bytemask[: index_nplike.shape_item_as_index(self._length)],
             self._content,
             self._valid_when,
             parameters=self._parameters,
@@ -437,16 +433,12 @@ class BitMaskedArray(Content):
             )
 
     def mask_as_bool(self, valid_when=None):
+        index_nplike = self._backend.index_nplike
         if valid_when is None:
             valid_when = self._valid_when
 
-        bytemask = ak.index.Index8.empty(
-            self._mask.length * 8, self._backend.index_nplike
-        )
-        assert (
-            bytemask.nplike is self._backend.nplike
-            and self._mask.nplike is self._backend.nplike
-        )
+        bytemask = ak.index.Index8.empty(self._mask.length * 8, index_nplike)
+        assert bytemask.nplike is index_nplike and self._mask.nplike is index_nplike
         self._backend.maybe_kernel_error(
             self._backend[
                 "awkward_BitMaskedArray_to_ByteMaskedArray",
@@ -460,7 +452,9 @@ class BitMaskedArray(Content):
                 self._lsb_order,
             )
         )
-        return bytemask.data[: self._length].view(np.bool_)
+        return bytemask.data[: index_nplike.shape_item_as_index(self._length)].view(
+            np.bool_
+        )
 
     def _getitem_nothing(self):
         return self._content._getitem_range(0, 0)
@@ -752,27 +746,40 @@ class BitMaskedArray(Content):
             raise AssertionError(result)
 
     def to_packed(self) -> Self:
+        index_nplike = self._backend.index_nplike
         if self._content.is_record:
             next = self.to_IndexedOptionArray64()
 
             content = next._content.to_packed()
-            if content.length > self._length:
-                content = content[: self._length]
+            if (
+                content.length is unknown_length
+                or self._length is unknown_length
+                or content.length > self._length
+            ):
+                content = content[: index_nplike.shape_item_as_index(self._length)]
 
             return ak.contents.IndexedOptionArray(
                 next._index, content, parameters=next._parameters
             )
 
         else:
-            excess_length = int(math.ceil(self._length / 8.0))
-            if self._mask.length == excess_length:
-                mask = self._mask
+            if (
+                self._mask.length is unknown_length
+                or self._length is unknown_length
+                or self._mask.length
+                != (excess_length := int(math.ceil(self._length / 8.0)))
+            ):
+                mask = self._mask[: index_nplike.shape_item_as_index(excess_length)]
             else:
-                mask = self._mask[:excess_length]
+                mask = self._mask
 
             content = self._content.to_packed()
-            if content.length > self._length:
-                content = content[: self._length]
+            if (
+                content.length is unknown_length
+                or self._length is unknown_length
+                or content.length > self._length
+            ):
+                content = content[: index_nplike.shape_item_as_index(self._length)]
 
             return BitMaskedArray(
                 mask,
@@ -791,7 +798,10 @@ class BitMaskedArray(Content):
         if out is not None:
             return out
 
-        mask = self.mask_as_bool(valid_when=True)[: self._length]
+        index_nplike = self._backend.index_nplike
+        mask = self.mask_as_bool(valid_when=True)[
+            : index_nplike.shape_item_as_index(self._length)
+        ]
         out = self._content._getitem_range(0, self._length)._to_list(
             behavior, json_conversions
         )

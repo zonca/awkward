@@ -542,7 +542,7 @@ class UnionArray(Content):
         tag, index = self._tags[where], self._index[where]
         return self._contents[tag]._getitem_at(index)
 
-    def _getitem_range(self, start: SupportsIndex, stop: IndexType) -> Content:
+    def _getitem_range(self, start: IndexType, stop: IndexType) -> Content:
         if not self._backend.nplike.known_data:
             self._touch_shape(recursive=False)
             return self
@@ -576,10 +576,12 @@ class UnionArray(Content):
 
     def _carry(self, carry: Index, allow_lazy: bool) -> Content:
         assert isinstance(carry, ak.index.Index)
-
+        index_nplike = self._backend.index_nplike
         try:
             nexttags = self._tags[carry.data]
-            nextindex = self._index[: self._tags.length][carry.data]
+            nextindex = self._index[
+                : index_nplike.shape_item_as_index(self._tags.length)
+            ][carry.data]
         except IndexError as err:
             raise ak._errors.index_error(self, carry.data, str(err)) from err
 

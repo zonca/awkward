@@ -370,8 +370,7 @@ def broadcast_to_offsets_avoiding_carry(
 
     elif isinstance(list_content, ListOffsetArray):
         if index_nplike.array_equal(offsets.data, list_content.offsets.data):
-            next_length = index_nplike.index_as_shape_item(offsets[-1])
-            return list_content.content[:next_length]
+            return list_content.content._getitem_range(0, offsets[-1])
         else:
             return list_content._broadcast_tooffsets64(offsets).content
     elif isinstance(list_content, ListArray):
@@ -386,8 +385,7 @@ def broadcast_to_offsets_avoiding_carry(
                 list_content.stops.data.shape[0] != 0
                 and offsets[-1] != list_content.stops[-1]
             ):
-                next_length = index_nplike.index_as_shape_item(offsets[-1])
-                return list_content.content[:next_length]
+                return list_content.content._getitem_range(0, offsets[-1])
             else:
                 return list_content._broadcast_tooffsets64(offsets).content
         else:
@@ -396,7 +394,12 @@ def broadcast_to_offsets_avoiding_carry(
     elif isinstance(list_content, RegularArray):
         my_offsets = list_content._compact_offsets64(True)
         if index_nplike.array_equal(offsets.data, my_offsets.data):
-            return list_content.content[: list_content.size * list_content.length]
+            return list_content.content._getitem_range(
+                0,
+                index_nplike.shape_item_as_index(
+                    list_content.size * list_content.length
+                ),
+            )
         else:
             return list_content._broadcast_tooffsets64(offsets).content
 

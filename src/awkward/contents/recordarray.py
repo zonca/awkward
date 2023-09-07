@@ -441,7 +441,7 @@ class RecordArray(Content):
             raise ak._errors.index_error(self, where)
         return Record(self, where)
 
-    def _getitem_range(self, start: SupportsIndex, stop: IndexType) -> Content:
+    def _getitem_range(self, start: IndexType, stop: IndexType) -> Content:
         if not self._backend.nplike.known_data:
             self._touch_shape(recursive=False)
 
