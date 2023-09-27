@@ -3,7 +3,10 @@ on:
   push:
     branches:
       - main
-  pull_request:
+  # Use pull_request_target rather than pull_request to allow forks to access secrets
+  # This also means that PR-triggered runs of this workflow will use the upstream workflow, not the forked version
+  # Manual dispatch can be used to overcome this, if needs be (only for trusted branches)
+  pull_request_target:
   release:
     types: [released]
   workflow_dispatch:
