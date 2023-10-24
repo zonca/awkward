@@ -215,3 +215,4 @@ def install_jupyterlite_styles(app, pagename, templatename, context, event_arg) 
 
 def setup(app):
     app.connect("html-page-context", install_jupyterlite_styles)
+

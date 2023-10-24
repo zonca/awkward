@@ -37,6 +37,7 @@ def to_parquet(
     parquet_compliant_nested=False,  # https://issues.apache.org/jira/browse/ARROW-16348
     parquet_extra_options=None,
     storage_options=None,
+    iterate=False,
 ):
     """
     Args:
@@ -181,7 +182,7 @@ def to_parquet(
 
     pyarrow_parquet = awkward._connect.pyarrow.import_pyarrow_parquet("ak.to_parquet")
     fsspec = awkward._connect.pyarrow.import_fsspec("ak.to_parquet")
-
+    pyarrow = awkward._connect.pyarrow.import_pyarrow("ak.to_parquet")
     layout = ak.operations.ak_to_layout._impl(
         data, allow_record=True, allow_other=False, regulararray=True
     )
@@ -306,6 +307,11 @@ def to_parquet(
 
     fs, destination = fsspec.core.url_to_fs(destination, **(storage_options or {}))
     metalist = []
+
+    if iterate:
+        iterator = batch_iterator(layout, list_to32, string_to32, bytestring_to32, emptyarray_to, categorical_as_dictionary, extensionarray, count_nulls)
+        first = next(iterator)
+
     with pyarrow_parquet.ParquetWriter(
         destination,
         table.schema,
@@ -325,7 +331,20 @@ def to_parquet(
         metadata_collector=metalist,
         **parquet_extra_options,
     ) as writer:
-        writer.write_table(table, row_group_size=row_group_size)
+        if iterate:
+            writer.write_table(pyarrow.Table.from_batches([first]))
+            try:
+                while True:
+                    try:
+                        record_batch = next(iterator)
+                    except StopIteration:
+                        break
+                    else:
+                        writer.write_table(pyarrow.Table.from_batches([record_batch]))
+            finally:
+                writer.close()
+        else:
+            writer.write_table(table, row_group_size=row_group_size)
     meta = metalist[0]
     meta.set_file_path(destination.rsplit("/", 1)[-1])
     return meta
@@ -342,3 +361,52 @@ def write_metadata(dir_path, fs, *metas, global_metadata=True):
             md.append_row_groups(meta)
         with fs.open("/".join([dir_path, "_metadata"]), "wb") as fil:
             md.write_metadata_file(fil)
+
+
+def batch_iterator(layout, list_to32, string_to32, bytestring_to32, emptyarray_to, categorical_as_dictionary, extensionarray, count_nulls):
+    import awkward._connect.pyarrow
+
+    pyarrow = awkward._connect.pyarrow.import_pyarrow("ak.to_parquet")
+
+    if isinstance(ak.operations.type(layout), ak.types.RecordType):
+        names = layout.keys()
+        contents = [layout[name] for name in names]
+    else:
+        names = [""]
+        contents = [layout]
+
+    pa_arrays = []
+    pa_fields = []
+    for name, content in zip(names, contents):
+        pa_arrays.append(
+            ak.operations.ak_to_arrow._impl(
+                layout,
+                list_to32,
+                string_to32,
+                bytestring_to32,
+                emptyarray_to,
+                categorical_as_dictionary,
+                extensionarray,
+                count_nulls,
+            )
+        )
+        pa_fields.append(
+            pyarrow.field(name, pa_arrays[-1].type).with_nullable(
+                isinstance(
+                    ak.operations.type(content), ak.types.OptionType
+                )
+            )
+        )
+    yield pyarrow.RecordBatch.from_arrays(
+        pa_arrays, schema=pyarrow.schema(pa_fields)
+    )
+
+
+array = ak.Array([[1.1, 2.2, 3.3], [], [4.4, 5.5]])
+array1 = ak.Array([[1.1, 2.2, 3.3, 4.4], [4.0], [4.4, 5.5]])
+array2 = ak.Array([[1.0, 3.0, 3.3, 4.4], [4.0], [4.4, 10.0], [11.11]])
+
+to_parquet(array, "src/awkward/operations/samples/array.parquet", iterate=True)
+to_parquet(array1, "src/awkward/operations/samples/array1.parquet", iterate=True)
+to_parquet(array2, "src/awkward/operations/samples/array2.parquet")
+
