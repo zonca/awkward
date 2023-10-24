@@ -400,13 +400,3 @@ def batch_iterator(layout, list_to32, string_to32, bytestring_to32, emptyarray_t
     yield pyarrow.RecordBatch.from_arrays(
         pa_arrays, schema=pyarrow.schema(pa_fields)
     )
-
-
-array = ak.Array([[1.1, 2.2, 3.3], [], [4.4, 5.5]])
-array1 = ak.Array([[1.1, 2.2, 3.3, 4.4], [4.0], [4.4, 5.5]])
-array2 = ak.Array([[1.0, 3.0, 3.3, 4.4], [4.0], [4.4, 10.0], [11.11]])
-
-to_parquet(array, "src/awkward/operations/samples/array.parquet", iterate=True)
-to_parquet(array1, "src/awkward/operations/samples/array1.parquet", iterate=True)
-to_parquet(array2, "src/awkward/operations/samples/array2.parquet")
-
