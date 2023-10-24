@@ -1,8 +1,8 @@
-
 __all__ = ("to_parquet_dataset",)
 
 import awkward as ak
 from awkward._dispatch import high_level_function
+
 
 def write_metadata(dir_path, fs, *metas, global_metadata=True):
     """Generate metadata file(s) from list of arrow metadata instances"""
@@ -38,14 +38,17 @@ def to_parquet_dataset(directory, filenames=None, filename_extension=".parquet")
     The `_metadata` contains row-group metadata used to seek to specific row-groups
     within the multi-file dataset.
     """
-#    # Dispatch
-#     yield (array,)
+    #    # Dispatch
+    #     yield (array,)
 
     # Implementation
-    import awkward._connect.pyarrow
     import os
 
-    pyarrow_parquet = awkward._connect.pyarrow.import_pyarrow_parquet("ak.to_parquet_dataset")
+    import awkward._connect.pyarrow
+
+    pyarrow_parquet = awkward._connect.pyarrow.import_pyarrow_parquet(
+        "ak.to_parquet_dataset"
+    )
     # fsspec = awkward._connect.pyarrow.import_fsspec("ak.to_parquet")
 
     # pyarrow = _import_pyarrow("ak.to_parquet.dataset")
@@ -54,13 +57,13 @@ def to_parquet_dataset(directory, filenames=None, filename_extension=".parquet")
     directory = _regularize_path(directory)
     if not os.path.isdir(directory):
         raise ValueError(
-            f"{directory!r} is not a local filesystem directory"
-            + {__file__}
+            f"{directory!r} is not a local filesystem directory" + {__file__}
         )
 
-# Need way to search for filenames, without glob?
+    # Need way to search for filenames, without glob?
     if filenames is None:
         import glob
+
         filenames = sorted(
             glob.glob(directory + f"/**/*{filename_extension}", recursive=True)
         )
@@ -75,8 +78,7 @@ def to_parquet_dataset(directory, filenames=None, filename_extension=".parquet")
         pyarrow_parquet, filenames, relpaths
     )
     pyarrow_parquet.write_metadata(schema, os.path.join(directory, "_common_metadata"))
-    print("Do the schema match?", metadata_collector[0].schema.equals(metadata_collector[1].schema), metadata_collector[1].schema.equals(metadata_collector[2].schema))
-    print("Column schema?", metadata_collector[0].schema.column(0).equals(metadata_collector[1].schema.column(0)), metadata_collector[1].schema.column(0).equals(metadata_collector[2].schema.column(0)))
+
     pyarrow_parquet.write_metadata(
         schema,
         os.path.join(directory, "_metadata"),
@@ -86,6 +88,7 @@ def to_parquet_dataset(directory, filenames=None, filename_extension=".parquet")
 
 def _regularize_path(path):
     import os
+
     if isinstance(path, getattr(os, "PathLike", ())):
         path = os.fspath(path)
 
@@ -103,7 +106,10 @@ def _regularize_path(path):
 
     return path
 
-def _common_parquet_schema(pq, filenames, relpaths): # checks that all file schema are the same
+
+def _common_parquet_schema(
+    pq, filenames, relpaths
+):  # checks that all file schema are the same
     assert len(filenames) != 0
     schema = None
     metadata_collector = []
@@ -123,40 +129,89 @@ def _common_parquet_schema(pq, filenames, relpaths): # checks that all file sche
     return schema, metadata_collector
 
 
-
 @high_level_function()
 def pyarrow_parquet_dataset(
-        path_or_paths=None, 
-        filesystem=None, 
-        schema=None, 
-        metadata=None, 
-        split_row_groups=False, 
-        validate_schema=True, 
-        filters=None, 
-        metadata_nthreads=None, 
-        read_dictionary=None, 
-        memory_map=False, 
-        buffer_size=0, 
-        partitioning='hive', 
-        use_legacy_dataset=None, 
-        pre_buffer=True, 
-        coerce_int96_timestamp_unit=None, 
-        thrift_string_size_limit=None, 
-        thrift_container_size_limit=None
-    ):
-    _impl(path_or_paths, filesystem, schema, metadata, split_row_groups, validate_schema,
-                                   filters, metadata_nthreads, read_dictionary, memory_map, buffer_size, partitioning,
-                                   use_legacy_dataset, pre_buffer, coerce_int96_timestamp_unit, thrift_container_size_limit, thrift_string_size_limit)
+    path_or_paths=None,
+    filesystem=None,
+    schema=None,
+    metadata=None,
+    split_row_groups=False,
+    validate_schema=True,
+    filters=None,
+    metadata_nthreads=None,
+    read_dictionary=None,
+    memory_map=False,
+    buffer_size=0,
+    partitioning="hive",
+    use_legacy_dataset=None,
+    pre_buffer=True,
+    coerce_int96_timestamp_unit=None,
+    thrift_string_size_limit=None,
+    thrift_container_size_limit=None,
+):
+    _impl(
+        path_or_paths,
+        filesystem,
+        schema,
+        metadata,
+        split_row_groups,
+        validate_schema,
+        filters,
+        metadata_nthreads,
+        read_dictionary,
+        memory_map,
+        buffer_size,
+        partitioning,
+        use_legacy_dataset,
+        pre_buffer,
+        coerce_int96_timestamp_unit,
+        thrift_container_size_limit,
+        thrift_string_size_limit,
+    )
 
 
-def _impl(path_or_paths, filesystem, schema, metadata, split_row_groups, validate_schema,
-                                   filters, metadata_nthreads, read_dictionary, memory_map, buffer_size, partitioning,
-                                   use_legacy_dataset, pre_buffer, coerce_int96_timestamp_unit, thrift_container_size_limit, thrift_string_size_limit):
+def _impl(
+    path_or_paths,
+    filesystem,
+    schema,
+    metadata,
+    split_row_groups,
+    validate_schema,
+    filters,
+    metadata_nthreads,
+    read_dictionary,
+    memory_map,
+    buffer_size,
+    partitioning,
+    use_legacy_dataset,
+    pre_buffer,
+    coerce_int96_timestamp_unit,
+    thrift_container_size_limit,
+    thrift_string_size_limit,
+):
     import awkward._connect.pyarrow
-    pyarrow_parquet = awkward._connect.pyarrow.import_pyarrow_parquet("ak.to_parquet_dataset")
+
+    pyarrow_parquet = awkward._connect.pyarrow.import_pyarrow_parquet(
+        "ak.to_parquet_dataset"
+    )
     # import pyarrow.parquet
 
-    pyarrow_parquet.ParquetDataset(path_or_paths, filesystem, schema, metadata, split_row_groups, validate_schema,
-                                   filters, metadata_nthreads, read_dictionary, memory_map, buffer_size, partitioning,
-                                   use_legacy_dataset, pre_buffer, coerce_int96_timestamp_unit, thrift_container_size_limit, thrift_string_size_limit)
-    
+    pyarrow_parquet.ParquetDataset(
+        path_or_paths,
+        filesystem,
+        schema,
+        metadata,
+        split_row_groups,
+        validate_schema,
+        filters,
+        metadata_nthreads,
+        read_dictionary,
+        memory_map,
+        buffer_size,
+        partitioning,
+        use_legacy_dataset,
+        pre_buffer,
+        coerce_int96_timestamp_unit,
+        thrift_container_size_limit,
+        thrift_string_size_limit,
+    )

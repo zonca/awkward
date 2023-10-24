@@ -309,7 +309,16 @@ def to_parquet(
     metalist = []
 
     if iterate:
-        iterator = batch_iterator(layout, list_to32, string_to32, bytestring_to32, emptyarray_to, categorical_as_dictionary, extensionarray, count_nulls)
+        iterator = batch_iterator(
+            layout,
+            list_to32,
+            string_to32,
+            bytestring_to32,
+            emptyarray_to,
+            categorical_as_dictionary,
+            extensionarray,
+            count_nulls,
+        )
         first = next(iterator)
 
     with pyarrow_parquet.ParquetWriter(
@@ -363,7 +372,16 @@ def write_metadata(dir_path, fs, *metas, global_metadata=True):
             md.write_metadata_file(fil)
 
 
-def batch_iterator(layout, list_to32, string_to32, bytestring_to32, emptyarray_to, categorical_as_dictionary, extensionarray, count_nulls):
+def batch_iterator(
+    layout,
+    list_to32,
+    string_to32,
+    bytestring_to32,
+    emptyarray_to,
+    categorical_as_dictionary,
+    extensionarray,
+    count_nulls,
+):
     import awkward._connect.pyarrow
 
     pyarrow = awkward._connect.pyarrow.import_pyarrow("ak.to_parquet")
@@ -392,11 +410,7 @@ def batch_iterator(layout, list_to32, string_to32, bytestring_to32, emptyarray_t
         )
         pa_fields.append(
             pyarrow.field(name, pa_arrays[-1].type).with_nullable(
-                isinstance(
-                    ak.operations.type(content), ak.types.OptionType
-                )
+                isinstance(ak.operations.type(content), ak.types.OptionType)
             )
         )
-    yield pyarrow.RecordBatch.from_arrays(
-        pa_arrays, schema=pyarrow.schema(pa_fields)
-    )
+    yield pyarrow.RecordBatch.from_arrays(pa_arrays, schema=pyarrow.schema(pa_fields))
