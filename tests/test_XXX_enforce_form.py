@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from itertools import permutations
+
 import pytest
 
 import awkward as ak
@@ -238,7 +240,55 @@ def determine_form_for_enforcing_type(form, type_, ctx):
             )
 
     elif form.is_union and is_union(type_):
-        raise NotImplementedError
+        # Type and form have same number of contents. Up-to *one* content can differ
+        if len(type_.contents) == len(form.contents):
+            for permuted_types in permutations(type_.contents):
+                content_matches_type = [
+                    content.type == permuted_type
+                    for content, permuted_type in zip(form.contents, permuted_types)
+                ]
+                n_matching = sum(content_matches_type)
+
+                if n_matching >= len(type_.contents) - 1:
+                    return form.copy(
+                        contents=[
+                            determine_form_for_enforcing_type(
+                                content, permuted_type, ctx
+                            )
+                            for content, permuted_type in zip(
+                                form.contents, permuted_types
+                            )
+                        ],
+                        parameters=type_._parameters,
+                    )
+                else:
+                    raise TypeError(
+                        "UnionArray(s) can currently only be converted into UnionArray(s) with the same number of contents "
+                        "if no greater than one content differs in type"
+                    )
+
+        # Add new content
+        elif len(type_.contents) > len(form.contents):
+            for permuted_types in permutations(type_.contents, len(form.contents)):
+                if all(
+                    content.type == permuted_type
+                    for content, permuted_type in zip(form.contents, permuted_types)
+                ):
+                    contents = [
+                        determine_form_for_enforcing_type(content, permuted_type, ctx)
+                        for content, permuted_type in zip(form.contents, permuted_types)
+                    ]
+                    # contents.extend
+                    return form.copy(contents=contents, parameters=type_._parameters)
+                else:
+                    raise TypeError(
+                        "UnionArray(s) can currently only be converted into UnionArray(s) with the same number of contents "
+                        "if no greater than one content differs in type"
+                    )
+        # Drop content
+        else:
+            ...
+
     elif is_union(type_):
         current_type = form.type
         for i, content_type in enumerate(type_.contents):
