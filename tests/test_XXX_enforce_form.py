@@ -13,6 +13,7 @@ from awkward._typing import TYPE_CHECKING, TypeGuard
 
 if TYPE_CHECKING:
     from awkward.forms import Form
+    from awkward.contents import Content
     from awkward.types import (
         ListType,
         NumpyType,
@@ -438,6 +439,11 @@ def determine_form_for_enforcing_type(form: Form, type_: Type, ctx: Ctx) -> Form
         )
     else:
         raise NonEnforcibleConversionError
+
+
+def enforce_form(layout: Content, form: Form, ctx: Ctx) -> Content:
+    if layout.is_numpy and form.is_numpy:
+
 
 
 def test():
