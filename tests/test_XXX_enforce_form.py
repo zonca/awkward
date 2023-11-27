@@ -9,20 +9,19 @@ import pytest
 import awkward as ak
 from awkward._nplikes.shape import unknown_length
 from awkward._parameters import type_parameters_equal
-
 from awkward._typing import TYPE_CHECKING, TypeGuard
 
 if TYPE_CHECKING:
     from awkward.forms import Form
     from awkward.types import (
-        Type,
+        ListType,
+        NumpyType,
         OptionType,
+        RecordType,
+        RegularType,
+        Type,
         UnionType,
         UnknownType,
-        NumpyType,
-        RegularType,
-        ListType,
-        RecordType,
     )
 
 
@@ -185,8 +184,12 @@ def determine_form_for_enforcing_type(form: Form, type_: Type, ctx: Ctx) -> Form
         return determine_form_for_enforcing_type(form.content, type_, ctx)
     # Remove option
     elif form.is_option and not is_option(type_):
-        child = determine_form_for_enforcing_type(form.content, type_, ctx)
-        return ctx.choose(
+        child_ctx = ctx.child()
+        # We need to project out the option
+        ctx.set()
+        # But the child context does not, because we can introduce an indexed node
+        child = determine_form_for_enforcing_type(form.content, type_, child_ctx)
+        return child_ctx.choose(
             # If packed, drop option node entirely
             child,
             # Else, use an indexed node
@@ -212,7 +215,7 @@ def determine_form_for_enforcing_type(form: Form, type_: Type, ctx: Ctx) -> Form
             raise NonEnforcibleConversionError(
                 f"regular form has different size ({form.size}) to type ({type_.size})"
             )
-        return determine_form_for_enforcing_type(form.content, type_.content, ctx).copy(
+        return form.copy(content=determine_form_for_enforcing_type(form.content, type_.content, ctx),
             parameters=type_._parameters
         )
     # Regular to list
@@ -224,7 +227,8 @@ def determine_form_for_enforcing_type(form: Form, type_: Type, ctx: Ctx) -> Form
         )
     # List to list
     elif form.is_list and is_list(type_):
-        return determine_form_for_enforcing_type(form.content, type_.content, ctx).copy(
+        return form.copy(
+            content=determine_form_for_enforcing_type(form.content, type_.content, ctx),
             parameters=type_._parameters
         )
     # Change dtype!
@@ -364,12 +368,17 @@ def determine_form_for_enforcing_type(form: Form, type_: Type, ctx: Ctx) -> Form
                     determine_form_for_enforcing_type(content, permuted_type, ctx)
                     for content, permuted_type in zip(form.contents, permuted_types)
                 ]
-                missing_types = set(type_.contents) - set(permuted_types)
-                contents.extend([ak.forms.from_type(t) for t in missing_types])
+                contents.extend(
+                    [
+                        ak.forms.from_type(t)
+                        for t in type_.contents
+                        if t not in permuted_types
+                    ]
+                )
                 return form.copy(contents=contents, parameters=type_._parameters)
             else:
                 raise TypeError(
-                    f"UnionForm can currently only be converted into UnionType with a greater "
+                    "UnionForm can currently only be converted into UnionType with a greater "
                     "number of contents if the UnionForm's contents are compatible with some permutation of "
                     "the UnionType's contents"
                 )
@@ -390,10 +399,14 @@ def determine_form_for_enforcing_type(form: Form, type_: Type, ctx: Ctx) -> Form
                         type_.contents, permuted_contents
                     )
                 ]
+
+                # We need to project out unused items, so that the content
+                # can be dropped
+                ctx.set()
                 return form.copy(contents=contents, parameters=type_._parameters)
             else:
                 raise TypeError(
-                    f"UnionForm can currently only be converted into UnionType with fewer "
+                    "UnionForm can currently only be converted into UnionType with fewer "
                     "contents if the UnionType's contents are compatible with some permutation of "
                     "the UnionForm's contents"
                 )
@@ -428,19 +441,22 @@ def determine_form_for_enforcing_type(form: Form, type_: Type, ctx: Ctx) -> Form
 
 
 def test():
-    numpy_layout = ak.to_layout([1.0, 2.0, 3.0])
-    numpy_form = numpy_layout.form
-
     # Change NumPy DType
     assert determine_form_for_enforcing_type(
-        numpy_form, ak.types.from_datashape("int64", highlevel=False), Ctx()
+        ak.forms.NumpyForm("int64"),
+        ak.types.from_datashape("int64", highlevel=False),
+        Ctx(),
     ) == ak.forms.NumpyForm("int64")
 
+
+def test_unknown_to_any():
     # Unknown to type
     assert determine_form_for_enforcing_type(
         ak.forms.EmptyForm(), ak.types.from_datashape("int64", highlevel=False), Ctx()
     ) == ak.forms.NumpyForm("int64")
 
+
+def test_any_to_unknown():
     # Form to unknown
     with pytest.raises(
         NonEnforcibleConversionError,
@@ -451,6 +467,9 @@ def test():
             ak.types.OptionType(ak.types.UnknownType()),
             Ctx(),
         )
+
+
+def test_option_to_option_unknown():
     # Option to option-of-unknown
     assert determine_form_for_enforcing_type(
         ak.forms.ByteMaskedForm("i8", ak.forms.NumpyForm("int32"), valid_when=True),
@@ -458,25 +477,47 @@ def test():
         Ctx(),
     ) == ak.forms.IndexedOptionForm("i64", ak.forms.EmptyForm())
 
+
+def test_non_option_to_option():
     # Add option
     assert determine_form_for_enforcing_type(
-        numpy_form, ak.types.from_datashape("?int64", highlevel=False), Ctx()
+        ak.forms.NumpyForm("int64"),
+        ak.types.from_datashape("?int64", highlevel=False),
+        Ctx(),
     ) == ak.forms.UnmaskedForm(ak.forms.NumpyForm("int64"))
 
+
+def test_option_to_non_option_unmasked():
     # Remove (unmasked) option
     assert determine_form_for_enforcing_type(
-        ak.forms.UnmaskedForm(numpy_form),
+        ak.forms.UnmaskedForm(ak.forms.NumpyForm("int64")),
         ak.types.from_datashape("int64", highlevel=False),
         Ctx(),
     ) == ak.forms.NumpyForm("int64")
 
-    # Remove (unmasked) option (introduce index)
+
+def test_option_to_non_option_no_projection():
+    # Remove (indexed) option (introduce index)
     assert determine_form_for_enforcing_type(
-        ak.forms.IndexedOptionForm("i64", numpy_form),
+        ak.forms.IndexedOptionForm("i64", ak.forms.NumpyForm("int64")),
         ak.types.from_datashape("int64", highlevel=False),
         Ctx(),
     ) == ak.forms.IndexedForm("i64", ak.forms.NumpyForm("int64"))
 
+
+def test_option_to_non_option_projection():
+    # Remove (indexed) option (don't introduce index)
+    # The inner indexed node is still preserved
+    assert determine_form_for_enforcing_type(
+        ak.forms.IndexedOptionForm(
+            "i64", ak.forms.ListOffsetForm("i64", ak.forms.IndexedOptionForm("i32", ak.forms.NumpyForm("int64")))
+        ),
+        ak.types.from_datashape("var * int64", highlevel=False),
+        Ctx(),
+    ) == ak.forms.ListOffsetForm("i64", ak.forms.IndexedForm("i32", ak.forms.NumpyForm("int64")))
+
+
+def test_add_record_field():
     # Add new field
     assert determine_form_for_enforcing_type(
         ak.forms.RecordForm([ak.forms.NumpyForm("int64")], fields=("x",)),
@@ -490,6 +531,8 @@ def test():
         fields=("x", "y"),
     )
 
+
+def test_add_record_slot():
     # Add new slot
     assert determine_form_for_enforcing_type(
         ak.forms.RecordForm([ak.forms.NumpyForm("int64")], fields=None),
@@ -503,6 +546,8 @@ def test():
         fields=None,
     )
 
+
+def test_adda_and_remove_record_field():
     # Remove field, add new field
     assert determine_form_for_enforcing_type(
         ak.forms.RecordForm([ak.forms.NumpyForm("int64")], fields=("x",)),
@@ -515,6 +560,8 @@ def test():
         fields=("y",),
     )
 
+
+def test_change_record_slot():
     # Change slot
     assert determine_form_for_enforcing_type(
         ak.forms.RecordForm([ak.forms.NumpyForm("int64")], fields=None),
@@ -527,6 +574,8 @@ def test():
         fields=None,
     )
 
+
+def test_tuple_to_record():
     # Change tuple to record
     with pytest.raises(
         NonEnforcibleConversionError,
@@ -538,6 +587,8 @@ def test():
             Ctx(),
         )
 
+
+def test_record_to_tuple():
     # Change record to tuple
     with pytest.raises(
         NonEnforcibleConversionError,
@@ -549,6 +600,8 @@ def test():
             Ctx(),
         )
 
+
+def test_non_union_to_union():
     # Create union
     assert determine_form_for_enforcing_type(
         ak.forms.NumpyForm("int64"),
@@ -563,6 +616,8 @@ def test():
         ],
     )
 
+
+def test_project_union():
     # Project single content
     assert determine_form_for_enforcing_type(
         ak.forms.UnionForm(
@@ -601,6 +656,8 @@ def test():
         ),
     )
 
+
+def test_drop_union_contents():
     # Enforce fewer contents
     assert determine_form_for_enforcing_type(
         ak.forms.UnionForm(
@@ -620,5 +677,38 @@ def test():
         [
             ak.forms.RecordForm([ak.forms.NumpyForm("int64")], ["x"]),
             ak.forms.RecordForm([ak.forms.NumpyForm("float32")], ["y"]),
+        ],
+    )
+
+
+def test_expand_union_contents():
+    # Enforce greater contents
+    assert determine_form_for_enforcing_type(
+        ak.forms.UnionForm(
+            "i8",
+            "i64",
+            [
+                ak.forms.RecordForm([ak.forms.NumpyForm("int64")], ["x"]),
+                ak.forms.RecordForm([ak.forms.NumpyForm("float32")], ["y"]),
+            ],
+        ),
+        ak.types.from_datashape(
+            "union[{x: int64}, {y: float32}, {z: ?datetime64[s]}]", highlevel=False
+        ),
+        Ctx(),
+    ) == ak.forms.UnionForm(
+        "i8",
+        "i64",
+        [
+            ak.forms.RecordForm([ak.forms.NumpyForm("int64")], ["x"]),
+            ak.forms.RecordForm([ak.forms.NumpyForm("float32")], ["y"]),
+            ak.forms.RecordForm(
+                [
+                    ak.forms.IndexedOptionForm(
+                        "i64", ak.forms.NumpyForm("datetime64[s]")
+                    )
+                ],
+                ["z"],
+            ),
         ],
     )
