@@ -7,33 +7,50 @@ from itertools import permutations
 import pytest
 
 import awkward as ak
+from awkward._nplikes.shape import unknown_length
+from awkward._parameters import type_parameters_equal
+
+from awkward._typing import TYPE_CHECKING, TypeGuard
+
+if TYPE_CHECKING:
+    from awkward.forms import Form
+    from awkward.types import (
+        Type,
+        OptionType,
+        UnionType,
+        UnknownType,
+        NumpyType,
+        RegularType,
+        ListType,
+        RecordType,
+    )
 
 
-def is_option(type_):
+def is_option(type_: Type) -> TypeGuard[OptionType]:
     return isinstance(type_, ak.types.OptionType)
 
 
-def is_union(type_):
+def is_union(type_: Type) -> TypeGuard[UnionType]:
     return isinstance(type_, ak.types.UnionType)
 
 
-def is_numpy(type_):
+def is_numpy(type_: Type) -> TypeGuard[NumpyType]:
     return isinstance(type_, ak.types.NumpyType)
 
 
-def is_unknown(type_):
+def is_unknown(type_: Type) -> TypeGuard[UnknownType]:
     return isinstance(type_, ak.types.UnknownType)
 
 
-def is_regular(type_):
+def is_regular(type_: Type) -> TypeGuard[RegularType]:
     return isinstance(type_, ak.types.RegularType)
 
 
-def is_list(type_):
+def is_list(type_: Type) -> TypeGuard[ListType]:
     return isinstance(type_, ak.types.ListType)
 
 
-def is_record(type_):
+def is_record(type_: Type) -> TypeGuard[RecordType]:
     return isinstance(type_, ak.types.RecordType)
 
 
@@ -68,7 +85,78 @@ class NonEnforcibleConversionError(TypeError):
     ...
 
 
-def determine_form_for_enforcing_type(form, type_, ctx):
+def form_has_type(form: Form, type_: Type) -> bool:
+    """
+    Args:
+        form: content object
+        type_: low-level type object
+
+    Returns True if the form satisfies the given type;, otherwise False.
+    """
+    if not type_parameters_equal(form._parameters, type_._parameters):
+        return False
+
+    if form.is_unknown:
+        return isinstance(type_, ak.types.UnknownType)
+    elif form.is_option:
+        return isinstance(type_, ak.types.OptionType) and form_has_type(
+            form.content, type_.content
+        )
+    elif form.is_indexed:
+        return form_has_type(form.content, type_)
+    elif form.is_regular:
+        return (
+            isinstance(type_, ak.types.RegularType)
+            and (
+                form.size is unknown_length
+                or type_.size is unknown_length
+                or form.size == type_.size
+            )
+            and form_has_type(form.content, type_.content)
+        )
+    elif form.is_list:
+        return isinstance(type_, ak.types.ListType) and form_has_type(
+            form.content, type_.content
+        )
+    elif form.is_numpy:
+        for _ in range(form.purelist_depth - 1):
+            if not isinstance(type_, ak.types.RegularType):
+                return False
+            type_ = type_.content
+        return (
+            isinstance(type_, ak.types.NumpyType) and form.primitive == type_.primitive
+        )
+    elif form.is_record:
+        if (
+            not isinstance(type_, ak.types.RecordType)
+            or type_.is_tuple != form.is_tuple
+        ):
+            return False
+
+        if form.is_tuple:
+            return all(
+                form_has_type(c, t) for c, t in zip(form.contents, type_.contents)
+            )
+        else:
+            return (frozenset(form.fields) == frozenset(type_.fields)) and all(
+                form_has_type(form.content(f), type_.content(f)) for f in type_.fields
+            )
+    elif form.is_union:
+        if len(form.contents) != len(type_.contents):
+            return False
+
+        for contents in permutations(form.contents):
+            if all(
+                form_has_type(form, type_)
+                for form, type_ in zip(contents, type_.contents)
+            ):
+                return True
+        return False
+    else:
+        raise TypeError(form)
+
+
+def determine_form_for_enforcing_type(form: Form, type_: Type, ctx: Ctx) -> Form:
     # Unknowns become canonical forms
     if form.is_unknown:
         return ak.forms.from_type(type_).copy(parameters=type_._parameters)
@@ -239,56 +327,78 @@ def determine_form_for_enforcing_type(form, type_, ctx):
                 "i8", "i64", next_contents, parameters=type_._parameters
             )
 
-    elif form.is_union and is_union(type_):
+    # Up to one changed content
+    elif (
+        form.is_union and is_union(type_) and len(type_.contents) == len(form.contents)
+    ):
         # Type and form have same number of contents. Up-to *one* content can differ
-        if len(type_.contents) == len(form.contents):
-            for permuted_types in permutations(type_.contents):
-                content_matches_type = [
-                    content.type == permuted_type
-                    for content, permuted_type in zip(form.contents, permuted_types)
-                ]
-                n_matching = sum(content_matches_type)
+        for permuted_types in permutations(type_.contents):
+            content_matches_type = [
+                form_has_type(content, permuted_type)
+                for content, permuted_type in zip(form.contents, permuted_types)
+            ]
+            n_matching = sum(content_matches_type)
 
-                if n_matching >= len(type_.contents) - 1:
-                    return form.copy(
-                        contents=[
-                            determine_form_for_enforcing_type(
-                                content, permuted_type, ctx
-                            )
-                            for content, permuted_type in zip(
-                                form.contents, permuted_types
-                            )
-                        ],
-                        parameters=type_._parameters,
-                    )
-                else:
-                    raise TypeError(
-                        "UnionArray(s) can currently only be converted into UnionArray(s) with the same number of contents "
-                        "if no greater than one content differs in type"
-                    )
-
-        # Add new content
-        elif len(type_.contents) > len(form.contents):
-            for permuted_types in permutations(type_.contents, len(form.contents)):
-                if all(
-                    content.type == permuted_type
-                    for content, permuted_type in zip(form.contents, permuted_types)
-                ):
-                    contents = [
+            if n_matching >= len(type_.contents) - 1:
+                return form.copy(
+                    contents=[
                         determine_form_for_enforcing_type(content, permuted_type, ctx)
                         for content, permuted_type in zip(form.contents, permuted_types)
-                    ]
-                    # contents.extend
-                    return form.copy(contents=contents, parameters=type_._parameters)
-                else:
-                    raise TypeError(
-                        "UnionArray(s) can currently only be converted into UnionArray(s) with the same number of contents "
-                        "if no greater than one content differs in type"
-                    )
-        # Drop content
-        else:
-            ...
+                    ],
+                    parameters=type_._parameters,
+                )
+            else:
+                raise TypeError(
+                    "UnionArray(s) can currently only be converted into UnionArray(s) with the same number of contents "
+                    "if no greater than one content differs in type"
+                )
 
+    # Add new content
+    elif form.is_union and is_union(type_) and len(type_.contents) > len(form.contents):
+        for permuted_types in permutations(type_.contents, len(form.contents)):
+            if all(
+                form_has_type(content, permuted_type)
+                for content, permuted_type in zip(form.contents, permuted_types)
+            ):
+                contents = [
+                    determine_form_for_enforcing_type(content, permuted_type, ctx)
+                    for content, permuted_type in zip(form.contents, permuted_types)
+                ]
+                missing_types = set(type_.contents) - set(permuted_types)
+                contents.extend([ak.forms.from_type(t) for t in missing_types])
+                return form.copy(contents=contents, parameters=type_._parameters)
+            else:
+                raise TypeError(
+                    f"UnionForm can currently only be converted into UnionType with a greater "
+                    "number of contents if the UnionForm's contents are compatible with some permutation of "
+                    "the UnionType's contents"
+                )
+    # Drop content
+    elif form.is_union and is_union(type_):
+        for permuted_contents in permutations(form.contents, len(type_.contents)):
+            if all(
+                form_has_type(permuted_content, positional_type)
+                for positional_type, permuted_content in zip(
+                    type_.contents, permuted_contents
+                )
+            ):
+                contents = [
+                    determine_form_for_enforcing_type(
+                        permuted_content, positional_type, ctx
+                    )
+                    for positional_type, permuted_content in zip(
+                        type_.contents, permuted_contents
+                    )
+                ]
+                return form.copy(contents=contents, parameters=type_._parameters)
+            else:
+                raise TypeError(
+                    f"UnionForm can currently only be converted into UnionType with fewer "
+                    "contents if the UnionType's contents are compatible with some permutation of "
+                    "the UnionForm's contents"
+                )
+
+    # Add a union!
     elif is_union(type_):
         current_type = form.type
         for i, content_type in enumerate(type_.contents):
@@ -310,7 +420,7 @@ def determine_form_for_enforcing_type(form, type_, ctx):
             )
 
         raise NonEnforcibleConversionError(
-            f"{type(form).__name__} can only be converted into a UnionType if it is compatible with one "
+            "UnionForm can only be converted into a UnionType if it is compatible with one "
             "of its contents, but no compatible content as found"
         )
     else:
@@ -479,10 +589,36 @@ def test():
         ),
         ak.types.from_datashape("{x: ?int64, y: ?float32}", highlevel=False),
         Ctx(),
-    ) == ak.forms.RecordForm(
+    ) == ak.forms.IndexedForm(
+        # This form adds an outer index because of the carry of a record array
+        "i64",
+        ak.forms.RecordForm(
+            [
+                ak.forms.IndexedOptionForm("i64", ak.forms.NumpyForm("int64")),
+                ak.forms.IndexedOptionForm("i64", ak.forms.NumpyForm("float32")),
+            ],
+            ["x", "y"],
+        ),
+    )
+
+    # Enforce fewer contents
+    assert determine_form_for_enforcing_type(
+        ak.forms.UnionForm(
+            "i8",
+            "i64",
+            [
+                ak.forms.RecordForm([ak.forms.NumpyForm("int64")], ["x"]),
+                ak.forms.RecordForm([ak.forms.NumpyForm("float32")], ["y"]),
+                ak.forms.RecordForm([ak.forms.NumpyForm("datetime64")], ["z"]),
+            ],
+        ),
+        ak.types.from_datashape("union[{x: int64}, {y: float32}]", highlevel=False),
+        Ctx(),
+    ) == ak.forms.UnionForm(
+        "i8",
+        "i64",
         [
-            ak.forms.IndexedOptionForm("i64", ak.forms.NumpyForm("int64")),
-            ak.forms.IndexedOptionForm("i64", ak.forms.NumpyForm("float32")),
+            ak.forms.RecordForm([ak.forms.NumpyForm("int64")], ["x"]),
+            ak.forms.RecordForm([ak.forms.NumpyForm("float32")], ["y"]),
         ],
-        ["x", "y"],
     )
