@@ -1275,7 +1275,7 @@ test_IndexedOption() {
 
   double data[3] = {3.3, 4.4, 5.5};
 
-  builder.extend_valid(3);
+  builder.extend_valid(1);
   subbuilder.extend(data, 3);
 
   builder.extend_invalid(2);
