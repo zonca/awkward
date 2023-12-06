@@ -350,6 +350,7 @@ jobs:
         path: docs/_build/.jupyter_cache
 
   branch-preview:
+    if: github.repository_owner == 'scikit-hep'
     runs-on: ubuntu-22.04
     needs: [build-docs]
     name: Deploy Branch Preview
